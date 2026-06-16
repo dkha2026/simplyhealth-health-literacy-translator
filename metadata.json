@@ -1,0 +1,6 @@
+{
+  "name": "SimplyHealth",
+  "description": "Helps users understand complex health information by translating medical jargon into simple, patient-friendly explanations using proper British English spelling.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
