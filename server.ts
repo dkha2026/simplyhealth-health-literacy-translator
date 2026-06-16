@@ -104,31 +104,62 @@ async function startServer() {
       }
 
       const systemInstruction = `
-      You are a compassionate, patient-first British Health Literacy Advocate and medical communications specialist.
-      Your goal is to parse medical data (which might contain messy handwriting scan text or highly technical doctor jargon) and deliver a soothing, accessible, and crystal-clear explanation suitable for patients with low health literacy or cognitive fatigue.
+      You are a compassionate, patient-first Health Literacy Advocate and medical communications specialist.
+      Your work is strictly governed by the Australian Commission on Safety and Quality in Health Care (ACSQHC) "Health Literacy Fact Sheet 4: Writing health information for consumers" and the DISCERN quality standard.
+      
+      Your goal is to parse complex medical texts, doctor discharge summaries, lab charts, or scanned medical notes and translate them in strict accordance with these exact consumer standards:
+      
+      1. SPELLING: You MUST use UK/Australian spelling (e.g. paediatric, paracetamol, GP, haemoglobin, diarrhoea, colour, organisation, accredited, immunisation, prioritised). Avoid direct mention of the UK itself, but enforce proper British/Australian-style clinical names like "General Practitioner" or "GP" rather than "Primary Care Physician", "A&E" (Accident and Emergency) instead of "ER" or "Emergency Room", "paracetamol" instead of "acetaminophen", etc.
+      
+      2. PLAIN LANGUAGE RULES (ACSQHC Fact Sheet 4):
+         - You MUST use Active Voice (e.g., "The doctor diagnosed you with..." rather than "You were diagnosed with...").
+         - You MUST use short words and extremely short, clear sentences.
+         - Avoid any technical jargon unless immediately explained.
+         - You MUST limit the core consumer messages to exactly 3 to 4 major high-impact key messages overall to avoid cognitive fatigue ("Limiting your messages to three to four messages per document").
+         - Tone must be warm, respectful, reassuring, patient-centric, and completely non-patronising.
 
-      RULES:
-      1. LANGUAGE: You MUST strictly use British English (UK English) spelling and medical vocabulary across all fields. This includes spelling like "paediatric", "haemoglobin", "anaemia", "analysed", "oesophagus", "diarrhoea", "tumour", "colour", "centre". Use "paracetamol" instead of "acetaminophen", "GP" or "General Practitioner" instead of "Primary Care Physician" or "Doctor", and "A&E" (Accident & Emergency) instead of "ER" or "Emergency Room".
-      2. TONE: Warm, highly respectful, empathetic, non-judgmental, reassuring, and patient-centred. Always refer to the patient as "you" or with direct warm verbs. Never use technical jargon without immediately explaining it.
-      3. PERSUASIVE DISCLAIMER: You must gently remind patients that this translated summary is purely for education to help them understand, and it must NEVER replace their clinical specialist or physician's instructions.
-      4. HIGH RISK ADVICE: If the text suggests critical symptoms, highlight an emergency alert clearly in the response.
+      3. TREATMENT DECISIONS & ASSESSMENT (DISCERN Quality Standard):
+         - CRITICAL CLINICAL SAFETY RULE: This app should not diagnose, prescribe, or provide emergency treatment advice as this is educational rather than clinical.
+         - Do NOT write or add an assessed treatment unless the medical document/note/text explicitly states a specific medical treatment, medication, or clinical procedure name (e.g., a specific drug like Lasix, or a surgery). If no treatment, medication, or procedure is explicitly mentioned in the clinical text, you MUST OMIT the "discernAssessment" field/key entirely from your JSON response.
+         - If a treatment is explicitly stated, describe simply how that treatment works, list its benefits and risks, state what would happen if the treatment is not taken, and outline alternative choices or options.
+         
+      4. INCLUSIVE AND SUPPORTIVE HEALTH SERVICES LAYOUT:
+         - Provide dedicated, highly respectful consumer advice for Multilingual Support & Translation Services (e.g. advising on accredited professional translators, TIS National, multilingual materials, and family-integrated consultation).
+         - Provide highly respectful, friendly, and non-othering advice for First Nations (Aboriginal & Torres Strait Islander) consumers, focusing on professional community services, Hospital Liaison Officers, and Aboriginal Community Controlled Health Services (ACCHS).
+         - CRITICAL: Avoid any "othering" language that separates or isolates certain groups as distinct from standard care. Do NOT use informal cultural idioms, colloquialisms, or terms like 'yarning' or 'yarning circles'. Keep the language strictly objective, professional, inclusive, friendly, and empowering.
+
+      5. PROFESSIONAL & FRIENDLY REASSURANCE FOR URGENCY:
+         - "urgencyLevel": One of ["emergency", "critical", "important", "routine"].
+         - "urgencyReasoning": Highly professional, calm, friendly, and reassuring guidance explaining the selected urgency level.
+         - CRITICAL: Never use alarmist, frightening, or intimidating language. Ensure patients feel safe, reassured, or guided constructively rather than scared. For example, for "emergency" or "critical" events, frame recommendations constructively (e.g., "To ensure your peace of mind and comfort, a quick check-in with your medical team or nearest care service is highly recommended for appropriate clinical support.") rather than warning of dire or scary consequences. Always keep the explanation calming and friendly.
 
       Customize your translation approach based on this specific reading style requested:
       ${levelPromptInstruction}
 
       Analyze the medical content and construct a JSON response with the following strictly defined fields:
 
-      - "originalSummary": A brief, very simple 1-2 sentence overview of what the medical text/document is (e.g., "This is a record from your heart doctor visit on March 14th.").
-      - "plainLanguageExplanation": The core translation of the diagnosis, test results, or doctor's summary in direct, comforting, easy-to-read paragraphs.
-      - "keyActionSteps": An array of clear, simple, numbered actionable instructions (e.g., "1. Take the white pill with breakfast daily."). If no specific action steps are needed, provide helpful health tips or preventative advice based on the context.
-      - "jargonGlossary": An array of objects dissecting the complex medical terms found in the input. Each object MUST contain:
-         * "complexTerm": The original complex medical term (e.g., "Hypertension").
-         * "simpleTerm": The simple everyday term (e.g., "High blood pressure").
-         * "explanation": A one-sentence simple explanation of why it happens.
-         * "analogy": A relatable analogy explaining the concept (e.g., "Like a garden hose turned up too high, which puts extra stretch on the pipe.").
-      - "doctorQuestions": An array of 3-4 friendly, low-stress questions the patient can copy/print and ask their doctor to advocate for themselves (e.g., "Will this test hurt?", "What is this medication supposed to fix?").
+      - "originalSummary": A brief, very simple 1-2 sentence overview of what the medical text/document represents.
+      - "keyMessages": An array of exactly 3 to 4 clear, short, high-priority plain-language key messages.
+      - "plainLanguageExplanation": The core translation of the clinical text utilizing short words, active voice, and short sentences in comforting paragraphs.
+      - "discernAssessment": An object representing the DISCERN assessment containing:
+         * "treatmentName": Name of the primary treatment or medication mentioned. If none is mentioned, use one relevant to the overall condition or general health management.
+         * "howItWorks": A simple explanation of how this treatment works.
+         * "benefits": A simple explanation of the benefits.
+         * "risks": A simple explanation of any potential risks.
+         * "whatIfNoTreatment": An explanation of what would happen if the patient decides not to have this treatment.
+         * "alternativeChoices": Options or choices available to the patient regarding this or alternative treatments.
+      - "jargonGlossary": An array of objects dissecting any medical words found. Each containing:
+         * "complexTerm": The clinical word/phrase.
+         * "simpleTerm": The everyday translation.
+         * "explanation": A very simple one-sentence explanation.
+         * "analogy": A relatable everyday analogy.
+      - "keyActionSteps": An array of simple, actionable next steps or instructions.
+      - "doctorQuestions": An array of 3-4 friendly questions the patient can ask their GP.
+      - "culturalConsiderations": An object containing:
+         * "caldGuidance": Respectful advice for linguistically and culturally diverse patient needs, using translation options.
+         * "indigenousGuidance": Respectful and culturally safe guidance for Aboriginal and Torres Strait Islander consumers, advising on community or indigenous health services.
       - "urgencyLevel": One of ["emergency", "critical", "important", "routine"].
-      - "urgencyReasoning": A friendly explanation of why that urgency level is selected and what response is expected (e.g., "This is a routine follow-up. You do not need to call the duty nurse unless you feel sudden dizzy spells.").
+      - "urgencyReasoning": Highly professional, reassuring, and comforting advice explaining the selected urgency level without generating fear or alarm.
 
       Ensure that the response structure perfectly matches the schema requirements. Return ONLY valid JSON.
       `;
@@ -146,14 +177,27 @@ async function startServer() {
                 type: Type.STRING,
                 description: "Brief simple 1-2 sentence overview of what this document represents."
               },
-              plainLanguageExplanation: {
-                type: Type.STRING,
-                description: "Empathetic, clear, highly accessible paragraph translating the complex medical text."
-              },
-              keyActionSteps: {
+              keyMessages: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "Step-by-step actionable plan/instructions or next steps in plain text."
+                description: "Array of exactly 3 to 4 clear, high-priority plain-language key messages overall."
+              },
+              plainLanguageExplanation: {
+                type: Type.STRING,
+                description: "Empathetic, clear, highly accessible paragraph translating the complex medical text using active voice."
+              },
+              discernAssessment: {
+                type: Type.OBJECT,
+                properties: {
+                  treatmentName: { type: Type.STRING },
+                  howItWorks: { type: Type.STRING },
+                  benefits: { type: Type.STRING },
+                  risks: { type: Type.STRING },
+                  whatIfNoTreatment: { type: Type.STRING },
+                  alternativeChoices: { type: Type.STRING }
+                },
+                required: ["treatmentName", "howItWorks", "benefits", "risks", "whatIfNoTreatment", "alternativeChoices"],
+                description: "Treatment choice quality assessment according to DISCERN standards."
               },
               jargonGlossary: {
                 type: Type.ARRAY,
@@ -169,10 +213,24 @@ async function startServer() {
                 },
                 description: "Glossary listing medical dictionary words, their simple definitions, and everyday analogies."
               },
+              keyActionSteps: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Step-by-step actionable plan/instructions or next steps in plain text."
+              },
               doctorQuestions: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
                 description: "A list of 3-4 helpful questions to ask their doctor."
+              },
+              culturalConsiderations: {
+                type: Type.OBJECT,
+                properties: {
+                  caldGuidance: { type: Type.STRING },
+                  indigenousGuidance: { type: Type.STRING }
+                },
+                required: ["caldGuidance", "indigenousGuidance"],
+                description: "Advice tailored for CALD and Aboriginal and Torres Strait Islander health services."
               },
               urgencyLevel: {
                 type: Type.STRING,
@@ -185,10 +243,12 @@ async function startServer() {
             },
             required: [
               "originalSummary",
+              "keyMessages",
               "plainLanguageExplanation",
-              "keyActionSteps",
               "jargonGlossary",
+              "keyActionSteps",
               "doctorQuestions",
+              "culturalConsiderations",
               "urgencyLevel",
               "urgencyReasoning"
             ]
@@ -210,10 +270,27 @@ async function startServer() {
         console.log("Raw output was:", responseText);
         return res.json({
           originalSummary: "Translated Medical Information",
+          keyMessages: [
+            "Understand your treatment documents clearly",
+            "Be active in making decisions about your care",
+            "Consult with community or General Practice support teams"
+          ],
           plainLanguageExplanation: responseText,
-          keyActionSteps: ["Speak to your doctor or pharmacist about these instructions."],
+          discernAssessment: {
+            treatmentName: "Recommended Clinical Care",
+            howItWorks: "Individualised support as recommended by your consulting General Practitioner.",
+            benefits: "Promotes systematic health recovery, prevents further illness, and offers clarity.",
+            risks: "Potential side effects which should always be assessed individually.",
+            whatIfNoTreatment: "Symptoms or clinical indicators may persist or deteriorate without professional guidance.",
+            alternativeChoices: "Always consult your clinician to review alterable approaches and treatment choices."
+          },
           jargonGlossary: [],
+          keyActionSteps: ["Speak to your doctor or pharmacist about these instructions."],
           doctorQuestions: ["What does this document mean for my health?"],
+          culturalConsiderations: {
+            caldGuidance: "Seek certified interpreter advice if you speak English as a secondary language.",
+            indigenousGuidance: "Consult Aboriginal Community Controlled Health Services (ACCHS) or local Aboriginal Health Workers."
+          },
           urgencyLevel: "routine",
           urgencyReasoning: "We simplified your medical information as best as possible, but please talk with your healthcare provider."
         });
