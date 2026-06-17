@@ -164,97 +164,116 @@ async function startServer() {
       Ensure that the response structure perfectly matches the schema requirements. Return ONLY valid JSON.
       `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: userContentParts,
-        config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              originalSummary: {
-                type: Type.STRING,
-                description: "Brief simple 1-2 sentence overview of what this document represents."
-              },
-              keyMessages: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Array of exactly 3 to 4 clear, high-priority plain-language key messages overall."
-              },
-              plainLanguageExplanation: {
-                type: Type.STRING,
-                description: "Empathetic, clear, highly accessible paragraph translating the complex medical text using active voice."
-              },
-              discernAssessment: {
+      let response = null;
+      let lastErr = null;
+      const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest"];
+
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`Processing translation request with model: ${modelName}`);
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: userContentParts,
+            config: {
+              systemInstruction: systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                  treatmentName: { type: Type.STRING },
-                  howItWorks: { type: Type.STRING },
-                  benefits: { type: Type.STRING },
-                  risks: { type: Type.STRING },
-                  whatIfNoTreatment: { type: Type.STRING },
-                  alternativeChoices: { type: Type.STRING }
-                },
-                required: ["treatmentName", "howItWorks", "benefits", "risks", "whatIfNoTreatment", "alternativeChoices"],
-                description: "Treatment choice quality assessment according to DISCERN standards."
-              },
-              jargonGlossary: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    complexTerm: { type: Type.STRING },
-                    simpleTerm: { type: Type.STRING },
-                    explanation: { type: Type.STRING },
-                    analogy: { type: Type.STRING }
+                  originalSummary: {
+                    type: Type.STRING,
+                    description: "Brief simple 1-2 sentence overview of what this document represents."
                   },
-                  required: ["complexTerm", "simpleTerm", "explanation", "analogy"]
+                  keyMessages: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "Array of exactly 3 to 4 clear, high-priority plain-language key messages overall."
+                  },
+                  plainLanguageExplanation: {
+                    type: Type.STRING,
+                    description: "Empathetic, clear, highly accessible paragraph translating the complex medical text using active voice."
+                  },
+                  discernAssessment: {
+                    type: Type.OBJECT,
+                    properties: {
+                      treatmentName: { type: Type.STRING },
+                      howItWorks: { type: Type.STRING },
+                      benefits: { type: Type.STRING },
+                      risks: { type: Type.STRING },
+                      whatIfNoTreatment: { type: Type.STRING },
+                      alternativeChoices: { type: Type.STRING }
+                    },
+                    required: ["treatmentName", "howItWorks", "benefits", "risks", "whatIfNoTreatment", "alternativeChoices"],
+                    description: "Treatment choice quality assessment according to DISCERN standards."
+                  },
+                  jargonGlossary: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        complexTerm: { type: Type.STRING },
+                        simpleTerm: { type: Type.STRING },
+                        explanation: { type: Type.STRING },
+                        analogy: { type: Type.STRING }
+                      },
+                      required: ["complexTerm", "simpleTerm", "explanation", "analogy"]
+                    },
+                    description: "Glossary listing medical dictionary words, their simple definitions, and everyday analogies."
+                  },
+                  keyActionSteps: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "Step-by-step actionable plan/instructions or next steps in plain text."
+                  },
+                  doctorQuestions: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "A list of 3-4 helpful questions to ask their doctor."
+                  },
+                  culturalConsiderations: {
+                    type: Type.OBJECT,
+                    properties: {
+                      caldGuidance: { type: Type.STRING },
+                      indigenousGuidance: { type: Type.STRING }
+                    },
+                    required: ["caldGuidance", "indigenousGuidance"],
+                    description: "Advice tailored for CALD and Aboriginal and Torres Strait Islander health services."
+                  },
+                  urgencyLevel: {
+                    type: Type.STRING,
+                    description: "Must be 'emergency', 'critical', 'important', or 'routine'."
+                  },
+                  urgencyReasoning: {
+                    type: Type.STRING,
+                    description: "Friendly reassurance or action-seeking advice explaining the urgency level."
+                  }
                 },
-                description: "Glossary listing medical dictionary words, their simple definitions, and everyday analogies."
-              },
-              keyActionSteps: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Step-by-step actionable plan/instructions or next steps in plain text."
-              },
-              doctorQuestions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "A list of 3-4 helpful questions to ask their doctor."
-              },
-              culturalConsiderations: {
-                type: Type.OBJECT,
-                properties: {
-                  caldGuidance: { type: Type.STRING },
-                  indigenousGuidance: { type: Type.STRING }
-                },
-                required: ["caldGuidance", "indigenousGuidance"],
-                description: "Advice tailored for CALD and Aboriginal and Torres Strait Islander health services."
-              },
-              urgencyLevel: {
-                type: Type.STRING,
-                description: "Must be 'emergency', 'critical', 'important', or 'routine'."
-              },
-              urgencyReasoning: {
-                type: Type.STRING,
-                description: "Friendly reassurance or action-seeking advice explaining the urgency level."
+                required: [
+                  "originalSummary",
+                  "keyMessages",
+                  "plainLanguageExplanation",
+                  "jargonGlossary",
+                  "keyActionSteps",
+                  "doctorQuestions",
+                  "culturalConsiderations",
+                  "urgencyLevel",
+                  "urgencyReasoning"
+                ]
               }
-            },
-            required: [
-              "originalSummary",
-              "keyMessages",
-              "plainLanguageExplanation",
-              "jargonGlossary",
-              "keyActionSteps",
-              "doctorQuestions",
-              "culturalConsiderations",
-              "urgencyLevel",
-              "urgencyReasoning"
-            ]
+            }
+          });
+          if (response) {
+            break;
           }
+        } catch (err: any) {
+          console.error(`Error querying Gemini model ${modelName}:`, err);
+          lastErr = err;
         }
-      });
+      }
+
+      if (!response) {
+        throw lastErr || new Error("Failed to get response from any configured Gemini models.");
+      }
 
       const responseText = response.text;
       if (!responseText) {
