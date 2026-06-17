@@ -133,6 +133,13 @@ async function startServer() {
          - "urgencyReasoning": Highly professional, calm, friendly, and reassuring guidance explaining the selected urgency level.
          - CRITICAL: Never use alarmist, frightening, or intimidating language. Ensure patients feel safe, reassured, or guided constructively rather than scared. For example, for "emergency" or "critical" events, frame recommendations constructively (e.g., "To ensure your peace of mind and comfort, a quick check-in with your medical team or nearest care service is highly recommended for appropriate clinical support.") rather than warning of dire or scary consequences. Always keep the explanation calming and friendly.
 
+      6. CLINICAL BOUNDARIES & UNSUPPORTED REQUESTS:
+         - If the user provides a request that asks for direct symptom diagnosis, symptom triaging, writing or copying a medical prescription, ordering laboratory tests, recommending specific medical dosages, or any clinical action that violates consumer self-education (e.g. asking "can you diagnose me?", "write me a prescription for penicillin", "what's my symptom chest pain mean?", etc.), you MUST set:
+           * "unsupportedRequestDetected" to true.
+           * "unsupportedRequestTitle" to a friendly direct title (e.g., "Educational Use & Prescription Policy").
+           * "unsupportedRequestMessage" to a direct, yet extremely friendly, respectful, and comforting explanation of why we cannot diagnose conditions or prescribe medications (e.g., noting that SimplyHealth is an educational health literacy tool, and advising them to consult their General Practitioner or local healthcare team for clinical diagnostics).
+         - If the request is a standard translation of a medical document (e.g. discharge summary, referral letter, lab test results), set "unsupportedRequestDetected" to false, "unsupportedRequestTitle" to "", and "unsupportedRequestMessage" to "".
+
       Customize your translation approach based on this specific reading style requested:
       ${levelPromptInstruction}
 
@@ -160,114 +167,145 @@ async function startServer() {
          * "indigenousGuidance": Respectful and culturally safe guidance for Aboriginal and Torres Strait Islander consumers, advising on community or indigenous health services.
       - "urgencyLevel": One of ["emergency", "critical", "important", "routine"].
       - "urgencyReasoning": Highly professional, reassuring, and comforting advice explaining the selected urgency level without generating fear or alarm.
+      - "unsupportedRequestDetected": Boolean indicating whether the request is asking for an unallowed clinical service (like prescribing or diagnosing).
+      - "unsupportedRequestTitle": Clear friendly title explaining the warning. Keep empty if not triggered.
+      - "unsupportedRequestMessage": Friendly professional reassurance explaining the limitations of the educational service. Keep empty if not triggered.
 
       Ensure that the response structure perfectly matches the schema requirements. Return ONLY valid JSON.
       `;
 
       let response = null;
       let lastErr = null;
-      const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest"];
+      const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-flash-latest"];
 
       for (const modelName of modelsToTry) {
-        try {
-          console.log(`Processing translation request with model: ${modelName}`);
-          response = await ai.models.generateContent({
-            model: modelName,
-            contents: userContentParts,
-            config: {
-              systemInstruction: systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  originalSummary: {
-                    type: Type.STRING,
-                    description: "Brief simple 1-2 sentence overview of what this document represents."
-                  },
-                  keyMessages: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "Array of exactly 3 to 4 clear, high-priority plain-language key messages overall."
-                  },
-                  plainLanguageExplanation: {
-                    type: Type.STRING,
-                    description: "Empathetic, clear, highly accessible paragraph translating the complex medical text using active voice."
-                  },
-                  discernAssessment: {
-                    type: Type.OBJECT,
-                    properties: {
-                      treatmentName: { type: Type.STRING },
-                      howItWorks: { type: Type.STRING },
-                      benefits: { type: Type.STRING },
-                      risks: { type: Type.STRING },
-                      whatIfNoTreatment: { type: Type.STRING },
-                      alternativeChoices: { type: Type.STRING }
+        let attempts = 0;
+        const maxAttempts = 3; // 1 initial try + 2 retries
+        while (attempts < maxAttempts) {
+          try {
+            attempts++;
+            console.log(`Processing translation request with model: ${modelName} (Attempt ${attempts}/${maxAttempts})`);
+            response = await ai.models.generateContent({
+              model: modelName,
+              contents: userContentParts,
+              config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    originalSummary: {
+                      type: Type.STRING,
+                      description: "Brief simple 1-2 sentence overview of what this document represents."
                     },
-                    required: ["treatmentName", "howItWorks", "benefits", "risks", "whatIfNoTreatment", "alternativeChoices"],
-                    description: "Treatment choice quality assessment according to DISCERN standards."
-                  },
-                  jargonGlossary: {
-                    type: Type.ARRAY,
-                    items: {
+                    keyMessages: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "Array of exactly 3 to 4 clear, high-priority plain-language key messages overall."
+                    },
+                    plainLanguageExplanation: {
+                      type: Type.STRING,
+                      description: "Empathetic, clear, highly accessible paragraph translating the complex medical text using active voice."
+                    },
+                    discernAssessment: {
                       type: Type.OBJECT,
                       properties: {
-                        complexTerm: { type: Type.STRING },
-                        simpleTerm: { type: Type.STRING },
-                        explanation: { type: Type.STRING },
-                        analogy: { type: Type.STRING }
+                        treatmentName: { type: Type.STRING },
+                        howItWorks: { type: Type.STRING },
+                        benefits: { type: Type.STRING },
+                        risks: { type: Type.STRING },
+                        whatIfNoTreatment: { type: Type.STRING },
+                        alternativeChoices: { type: Type.STRING }
                       },
-                      required: ["complexTerm", "simpleTerm", "explanation", "analogy"]
+                      required: ["treatmentName", "howItWorks", "benefits", "risks", "whatIfNoTreatment", "alternativeChoices"],
+                      description: "Treatment choice quality assessment according to DISCERN standards."
                     },
-                    description: "Glossary listing medical dictionary words, their simple definitions, and everyday analogies."
-                  },
-                  keyActionSteps: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "Step-by-step actionable plan/instructions or next steps in plain text."
-                  },
-                  doctorQuestions: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "A list of 3-4 helpful questions to ask their doctor."
-                  },
-                  culturalConsiderations: {
-                    type: Type.OBJECT,
-                    properties: {
-                      caldGuidance: { type: Type.STRING },
-                      indigenousGuidance: { type: Type.STRING }
+                    jargonGlossary: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          complexTerm: { type: Type.STRING },
+                          simpleTerm: { type: Type.STRING },
+                          explanation: { type: Type.STRING },
+                          analogy: { type: Type.STRING }
+                        },
+                        required: ["complexTerm", "simpleTerm", "explanation", "analogy"]
+                      },
+                      description: "Glossary listing medical dictionary words, their simple definitions, and everyday analogies."
                     },
-                    required: ["caldGuidance", "indigenousGuidance"],
-                    description: "Advice tailored for CALD and Aboriginal and Torres Strait Islander health services."
+                    keyActionSteps: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "Step-by-step actionable plan/instructions or next steps in plain text."
+                    },
+                    doctorQuestions: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "A list of 3-4 helpful questions to ask their doctor."
+                    },
+                    culturalConsiderations: {
+                      type: Type.OBJECT,
+                      properties: {
+                        caldGuidance: { type: Type.STRING },
+                        indigenousGuidance: { type: Type.STRING }
+                      },
+                      required: ["caldGuidance", "indigenousGuidance"],
+                      description: "Advice tailored for CALD and Aboriginal and Torres Strait Islander health services."
+                    },
+                    urgencyLevel: {
+                      type: Type.STRING,
+                      description: "Must be 'emergency', 'critical', 'important', or 'routine'."
+                    },
+                    urgencyReasoning: {
+                      type: Type.STRING,
+                      description: "Friendly reassurance or action-seeking advice explaining the urgency level."
+                    },
+                    unsupportedRequestDetected: {
+                      type: Type.BOOLEAN,
+                      description: "True if user is asking for a prescription, diagnosis, symptom triaging, or clinical advice. False otherwise."
+                    },
+                    unsupportedRequestTitle: {
+                      type: Type.STRING,
+                      description: "A clear, reassuring title if unsupportedRequestDetected is true."
+                    },
+                    unsupportedRequestMessage: {
+                      type: Type.STRING,
+                      description: "A friendly, direct, reassuring explanation of clinical boundaries."
+                    }
                   },
-                  urgencyLevel: {
-                    type: Type.STRING,
-                    description: "Must be 'emergency', 'critical', 'important', or 'routine'."
-                  },
-                  urgencyReasoning: {
-                    type: Type.STRING,
-                    description: "Friendly reassurance or action-seeking advice explaining the urgency level."
-                  }
-                },
-                required: [
-                  "originalSummary",
-                  "keyMessages",
-                  "plainLanguageExplanation",
-                  "jargonGlossary",
-                  "keyActionSteps",
-                  "doctorQuestions",
-                  "culturalConsiderations",
-                  "urgencyLevel",
-                  "urgencyReasoning"
-                ]
+                  required: [
+                    "originalSummary",
+                    "keyMessages",
+                    "plainLanguageExplanation",
+                    "jargonGlossary",
+                    "keyActionSteps",
+                    "doctorQuestions",
+                    "culturalConsiderations",
+                    "urgencyLevel",
+                    "urgencyReasoning",
+                    "unsupportedRequestDetected",
+                    "unsupportedRequestTitle",
+                    "unsupportedRequestMessage"
+                  ]
+                }
               }
+            });
+            if (response) {
+              break;
             }
-          });
-          if (response) {
-            break;
+          } catch (err: any) {
+            console.error(`Error querying Gemini model ${modelName} on attempt ${attempts}:`, err);
+            lastErr = err;
+            if (attempts < maxAttempts) {
+              const backoffTime = attempts * 1000;
+              console.log(`Waiting ${backoffTime}ms before retrying ${modelName}...`);
+              await new Promise((resolve) => setTimeout(resolve, backoffTime));
+            }
           }
-        } catch (err: any) {
-          console.error(`Error querying Gemini model ${modelName}:`, err);
-          lastErr = err;
+        }
+        if (response) {
+          break;
         }
       }
 
@@ -311,7 +349,10 @@ async function startServer() {
             indigenousGuidance: "Consult Aboriginal Community Controlled Health Services (ACCHS) or local Aboriginal Health Workers."
           },
           urgencyLevel: "routine",
-          urgencyReasoning: "We simplified your medical information as best as possible, but please talk with your healthcare provider."
+          urgencyReasoning: "We simplified your medical information as best as possible, but please talk with your healthcare provider.",
+          unsupportedRequestDetected: false,
+          unsupportedRequestTitle: "",
+          unsupportedRequestMessage: ""
         });
       }
     } catch (error: any) {

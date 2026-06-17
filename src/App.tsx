@@ -61,13 +61,16 @@ interface TranslationResult {
   originalSummary: string;
   keyMessages: string[];
   plainLanguageExplanation: string;
-  discernAssessment: DiscernTreatmentAssessment;
+  discernAssessment?: DiscernTreatmentAssessment;
   jargonGlossary: JargonItem[];
   keyActionSteps: string[];
   doctorQuestions: string[];
   culturalConsiderations: CulturalConsiderations;
   urgencyLevel: 'emergency' | 'critical' | 'important' | 'routine';
   urgencyReasoning: string;
+  unsupportedRequestDetected?: boolean;
+  unsupportedRequestTitle?: string;
+  unsupportedRequestMessage?: string;
 }
 
 export default function App() {
@@ -1357,7 +1360,61 @@ export default function App() {
                   {/* Body Content area */}
                   <div className="p-6 md:p-8 space-y-8">
                     
-                    {/* ACSQHC Key Messages Section */}
+                    {results.unsupportedRequestDetected ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`p-6 md:p-8 rounded-2xl border flex flex-col md:flex-row gap-6 items-start transition-all ${
+                          darkMode 
+                            ? "bg-amber-950/20 border-amber-500/30 text-amber-100" 
+                            : "bg-[#fffbeb] border-amber-200 text-amber-900"
+                        }`}
+                      >
+                        <div className={`p-3 rounded-xl shrink-0 ${
+                          darkMode ? "bg-amber-950/80 text-amber-400 border border-amber-800/20" : "bg-amber-100/90 text-amber-800 border border-amber-250"
+                        }`}>
+                          <AlertTriangle className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-4 flex-1">
+                          <h4 className="font-display font-medium text-base md:text-lg tracking-tight text-amber-600 dark:text-amber-400">
+                            {results.unsupportedRequestTitle || "Educational Use & Policies"}
+                          </h4>
+                          <p className={`text-sm leading-relaxed ${
+                            darkMode ? "text-amber-200/80" : "text-amber-800/80"
+                          }`}>
+                            {results.unsupportedRequestMessage}
+                          </p>
+                          <div className="pt-2 flex flex-wrap gap-3">
+                            <button
+                              onClick={resetApplication}
+                              className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 border transition-all cursor-pointer ${
+                                darkMode 
+                                  ? "bg-amber-950/50 border-amber-850 text-amber-400 hover:bg-amber-900/30" 
+                                  : "bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200"
+                              }`}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Translate Another Document
+                            </button>
+                            <a
+                              href="https://www.healthdirect.gov.au/gp"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 border transition-all ${
+                                darkMode
+                                  ? "bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900"
+                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              <HelpCircle className="h-3.5 w-3.5" />
+                              Contact Healthcare GP (Australia)
+                            </a>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <>
+                        {/* ACSQHC Key Messages Section */}
                     {results.keyMessages && results.keyMessages.length > 0 && (
                       <div className={`p-5 rounded-2xl border transition-all ${
                         darkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
@@ -1917,6 +1974,8 @@ export default function App() {
                         )}
                       </AnimatePresence>
                     </div>
+                      </>
+                    )}
 
                   </div>
 
